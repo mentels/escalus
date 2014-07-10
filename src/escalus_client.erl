@@ -19,6 +19,7 @@
 % Public API
 -export([start_for/3,
          start/3,
+         start_component/2,
          send/2,
          send_and_wait/2,
          stop/1,
@@ -52,6 +53,17 @@ start(Config, UserSpec, Resource) ->
             Jid = make_jid(Props),
             Client = #client{jid = Jid, conn = Conn, event_client = EventClient},
             escalus_cleaner:add_client(Config, Client),
+            {ok, Client};
+        {error, Error} ->
+            {error, Error}
+    end.
+
+start_component(_Config, Options) ->
+    SessionSteps = [component_start_stream,component_bind],
+    case escalus_connection:start(Options, SessionSteps) of
+        {ok, Conn, _Props, _} ->
+            Jid = proplists:get_value(bind_hostname, Options),
+            Client = #client{jid = Jid, conn = Conn},
             {ok, Client};
         {error, Error} ->
             {error, Error}

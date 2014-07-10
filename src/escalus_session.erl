@@ -6,17 +6,21 @@
 
 -module(escalus_session).
 -export([start_stream/2,
+         component_start_stream/2,
          authenticate/2,
          starttls/2,
          bind/2,
+         component_bind/2,
          compress/2,
          use_ssl/2,
          can_use_compression/2,
          can_use_stream_management/2,
          session/2]).
 
+
 %% New style connection initiation
 -export([start_stream/3,
+         component_start_stream/3,
          maybe_use_ssl/3,
          maybe_use_compression/3,
          maybe_stream_management/3,
@@ -25,6 +29,7 @@
          stream_resumption/3,
          authenticate/3,
          bind/3,
+         component_bind/3,
          session/3]).
 
 %% Public Types
@@ -84,6 +89,36 @@ start_stream(Conn, Props) ->
     end,
     {Props, get_stream_features(StreamFeatures)}.
 
+component_start_stream(Conn, Props) ->
+    {server, Server} = lists:keyfind(server, 1, Props),
+    XMLNS = <<"jabber:client">>,
+    {from, From} = lists:keyfind(from, 1, Props),
+    StreamStartReq = escalus_stanza:component_stream_start(
+                       Server, From, XMLNS),
+    ok = escalus_connection:send(Conn, StreamStartReq),
+    StreamStartRep = escalus_connection:get_stanza(Conn, wait_for_stream),
+    case StreamStartRep of
+        #xmlstreamend{} ->
+            error("Stream terminated by server");
+        #xmlstreamstart{} ->
+            ok
+    end,
+    StreamFeatures = escalus_connection:get_stanza(Conn, wait_for_features),
+    case StreamFeatures of
+        #xmlel{name = <<"stream:features">>,
+               children = [#xmlel{name = <<"bind">>,
+                                  attrs = [{<<"xmlns">>, <<"urn:xmpp:component:0">>}]
+                                 }]} ->
+            ok;
+        _ ->
+            error(
+              lists:flatten(
+                io_lib:format(
+                  "Expected stream features, got ~p",
+                  [StreamFeatures])))
+    end,
+    {Props, get_stream_features(StreamFeatures)}.
+
 starttls(Conn, Props) ->
     escalus_tcp:upgrade_to_tls(Conn, Props).
 
@@ -100,6 +135,16 @@ bind(Conn, Props) ->
     escalus_connection:send(Conn, escalus_stanza:bind(Resource)),
     BindReply = escalus_connection:get_stanza(Conn, bind_reply),
     %% FIXME: verify BindReply, add props
+    Props.
+
+component_bind(Conn, Props) ->
+    Hostname = proplists:get_value(bind_hostname,Props,
+                                   <<"escalus-default-component-bind">>),
+    QueryStanza = escalus_stanza:component_bind(Hostname),
+    escalus_connection:send(Conn, QueryStanza),
+    ResultStanza = escalus_connection:get_stanza(Conn, bind_reply),
+    true = escalus_pred:is_iq_result(QueryStanza, ResultStanza),
+    %% TODO: Verify that the given hostname was bound
     Props.
 
 compress(Conn, Props) ->
@@ -145,6 +190,11 @@ can_use_stream_management(Props, Features) ->
 -spec start_stream/3 :: ?CONNECTION_STEP.
 start_stream(Conn, Props, [] = _Features) ->
     {Props1, Features} = start_stream(Conn, Props),
+    {Conn, Props1, Features}.
+
+-spec component_start_stream/3 :: ?CONNECTION_STEP.
+component_start_stream(Conn, Props, [] = _Features) ->
+    {Props1, Features} = component_start_stream(Conn, Props),
     {Conn, Props1, Features}.
 
 -spec maybe_use_ssl/3 :: ?CONNECTION_STEP.
@@ -207,6 +257,10 @@ authenticate(Conn, Props, Features) ->
 -spec bind/3 :: ?CONNECTION_STEP.
 bind(Conn, Props, Features) ->
     {Conn, bind(Conn, Props), Features}.
+
+-spec component_bind/3 :: ?CONNECTION_STEP.
+component_bind(Conn, Props, Features) ->
+    {Conn, component_bind(Conn, Props), Features}.
 
 -spec session/3 :: ?CONNECTION_STEP.
 session(Conn, Props, Features) ->

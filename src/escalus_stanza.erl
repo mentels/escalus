@@ -84,6 +84,7 @@
          resume/2]).
 
 -export([stream_start/2,
+         component_stream_start/3,
          stream_end/0,
          ws_open/1,
          ws_close/0,
@@ -93,6 +94,7 @@
 -export([iq/2, iq/3]).
 
 -export([bind/1,
+         component_bind/1,
          session/0]).
 
 -export([setattr/3,
@@ -119,6 +121,16 @@
 stream_start(Server, XMLNS) ->
     #xmlstreamstart{name = <<"stream:stream">>,
                     attrs = [{<<"to">>, Server},
+                             {<<"version">>, <<"1.0">>},
+                             {<<"xml:lang">>, <<"en">>},
+                             {<<"xmlns">>, XMLNS},
+                             {<<"xmlns:stream">>,
+                              <<"http://etherx.jabber.org/streams">>}]}.
+
+component_stream_start(Server, From, XMLNS) ->
+    #xmlstreamstart{name = <<"stream:stream">>,
+                    attrs = [{<<"to">>, Server},
+                             {<<"from">>, From},
                              {<<"version">>, <<"1.0">>},
                              {<<"xml:lang">>, <<"en">>},
                              {<<"xmlns">>, XMLNS},
@@ -178,6 +190,14 @@ bind(Resource) ->
                attrs = [{<<"xmlns">>, <<"urn:ietf:params:xml:ns:xmpp-bind">>}],
                children = [#xmlel{name = <<"resource">>,
                                   children = [exml:escape_cdata(Resource)]}]}]).
+
+-spec component_bind(binary()) -> #xmlel{}.
+component_bind(Hostname) ->
+    iq(<<"set">>,
+       [#xmlel{name = <<"bind">>,
+               attrs = [{<<"xmlns">>, <<"urn:xmpp:component:0">>}],
+               children = [#xmlel{name = <<"hostname">>,
+                                  children = [exml:escape_cdata(Hostname)]}]}]).
 
 -spec session() -> #xmlel{}.
 session() ->
