@@ -95,6 +95,7 @@
 
 -export([bind/1,
          component_bind/1,
+         component_unbind/1,
          session/0]).
 
 -export([setattr/3,
@@ -195,6 +196,14 @@ bind(Resource) ->
 component_bind(Hostname) ->
     iq(<<"set">>,
        [#xmlel{name = <<"bind">>,
+               attrs = [{<<"xmlns">>, <<"urn:xmpp:component:0">>}],
+               children = [#xmlel{name = <<"hostname">>,
+                                  children = [exml:escape_cdata(Hostname)]}]}]).
+
+-spec component_unbind(binary()) -> #xmlel{}.
+component_unbind(Hostname) ->
+    iq(<<"set">>,
+       [#xmlel{name = <<"unbind">>,
                attrs = [{<<"xmlns">>, <<"urn:xmpp:component:0">>}],
                children = [#xmlel{name = <<"hostname">>,
                                   children = [exml:escape_cdata(Hostname)]}]}]).
