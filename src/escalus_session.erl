@@ -138,12 +138,14 @@ bind(Conn, Props) ->
     Props.
 
 component_bind(Conn, Props) ->
-    Hostname = proplists:get_value(bind_hostname,Props,
-                                   <<"escalus-default-component-bind">>),
-    QueryStanza = escalus_stanza:component_bind(Hostname),
-    escalus_connection:send(Conn, QueryStanza),
-    ResultStanza = escalus_connection:get_stanza(Conn, bind_reply),
-    true = escalus_pred:is_iq_result(QueryStanza, ResultStanza),
+    Hostnames = proplists:get_value(bind_hostname,Props,
+                                    [<<"escalus-default-component-bind">>]),
+    [begin
+         QueryStanza = escalus_stanza:component_bind(H),
+         escalus_connection:send(Conn, QueryStanza),
+         ResultStanza = escalus_connection:get_stanza(Conn, bind_reply),
+         true = escalus_pred:is_iq_result(QueryStanza, ResultStanza)
+     end || H <- Hostnames],
     %% TODO: Verify that the given hostname was bound
     Props.
 
